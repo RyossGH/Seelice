@@ -13,6 +13,7 @@
     <a class="logo" href="{{ url_for('index') }}"><span class="dot"></span>Seelice</a>
     <nav>
       <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint in ('index','camera_view') }}">Caméras</a>
+      <a href="{{ url_for('wall') }}" class="{{ 'active' if request.endpoint == 'wall' }}">Mur d'écrans</a>
       <a href="{{ url_for('scan_page') }}" class="{{ 'active' if request.endpoint == 'scan_page' }}">Scanner le réseau</a>
       <a href="{{ url_for('captures_page') }}" class="{{ 'active' if request.endpoint == 'captures_page' }}">Captures</a>
       <a href="{{ url_for('logout') }}" class="muted">Déconnexion</a>

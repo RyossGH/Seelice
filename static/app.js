@@ -10,15 +10,16 @@ const Seelice = (() => {
    */
   function liveLoop(img, overlay, camId, quality, isActive, fpsEl) {
     const getQ = typeof quality === 'function' ? quality : () => quality;
-    let after = 0, lastQ = getQ(), url = null, frames = 0, t0 = performance.now();
+    let after = 0, lastQ = getQ(), url = null, frames = 0, t0 = performance.now(), stopped = false;
 
     (async () => {
-      while (true) {
+      while (!stopped) {
         if (!isActive() || document.hidden) { await sleep(800); continue; }
         const q = getQ();
         if (q !== lastQ) { after = 0; lastQ = q; }
         try {
           const r = await fetch(`/api/frame/${camId}?q=${q}&after=${after}`, { cache: 'no-store' });
+          if (stopped) return;
           if (r.status === 200) {
             after = parseInt(r.headers.get('X-Frame-Id') || '0', 10);
             const blob = await r.blob();
@@ -45,7 +46,10 @@ const Seelice = (() => {
       }
     })();
 
-    return { reset() { after = 0; } };
+    return {
+      reset() { after = 0; },
+      stop() { stopped = true; if (url) setTimeout(() => URL.revokeObjectURL(url), 1000); },
+    };
   }
 
   function toast(msg, isError) {

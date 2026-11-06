@@ -468,6 +468,13 @@ def index():
     return render_template("index.html", cameras=all_cameras(), brands=BRANDS)
 
 
+@app.route("/mur")
+@login_required
+def wall():
+    cams = [{"id": c["id"], "name": c["name"], "location": c["location"]} for c in all_cameras()]
+    return render_template("wall.html", cameras=cams)
+
+
 @app.route("/camera/<int:cam_id>")
 @login_required
 def camera_view(cam_id):

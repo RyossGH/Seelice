@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mur d'écrans · Seelice</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23ef4444'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="wall-body">
+  <div class="wall-bar" id="bar">
+    <a class="logo" href="{{ url_for('index') }}"><span class="dot"></span>Seelice</a>
+    <span class="wall-count" id="count"></span>
+    <div class="wall-controls">
+      <label>Disposition
+        <select id="layout">
+          <option value="auto">Auto</option>
+          <option value="1">1 caméra</option>
+          <option value="4">2 × 2</option>
+          <option value="9">3 × 3</option>
+          <option value="16">4 × 4</option>
+          <option value="25">5 × 5</option>
+        </select>
+      </label>
+      <label>Défilement
+        <select id="cycle">
+          <option value="0">Désactivé</option>
+          <option value="10">10 s</option>
+          <option value="20">20 s</option>
+          <option value="60">1 min</option>
+        </select>
+      </label>
+      <span class="wall-page" id="page"></span>
+      <button class="btn small" id="prev" title="Page précédente (←)">◀</button>
+      <button class="btn small" id="next" title="Page suivante (→)">▶</button>
+      <button class="btn small" id="fs" title="Plein écran (F)">Plein écran</button>
+      <span class="wall-clock" id="clock"></span>
+    </div>
+  </div>
+
+  <div class="wall" id="wall"></div>
+
+  {% if not cameras %}
+  <div class="wall-empty">Aucune caméra. <a href="{{ url_for('camera_new') }}">Ajoute une caméra</a> pour remplir le mur.</div>
+  {% endif %}
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    const CAMS = {{ cameras|tojson }};
+    const wall = document.getElementById('wall');
+    const layoutSel = document.getElementById('layout'), cycleSel = document.getElementById('cycle');
+    const store = {
+      get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    };
+    layoutSel.value = store.get('seelice-wall-layout', 'auto');
+    cycleSel.value = store.get('seelice-wall-cycle', '0');
+
+    let status = {}, page = 0, focusId = null, loops = [], cycleTimer = null;
+
+    function perPage() {
+      if (layoutSel.value !== 'auto') return parseInt(layoutSel.value, 10);
+      const n = Math.max(1, CAMS.length);
+      const side = Math.min(5, Math.ceil(Math.sqrt(n)));
+      return side * side;
+    }
+    const pageCount = () => Math.max(1, Math.ceil(CAMS.length / perPage()));
+
+    function render() {
+      loops.forEach(l => l.stop()); loops = [];
+      wall.innerHTML = '';
+      let list, cols, quality;
+      if (focusId !== null) {
+        list = CAMS.filter(c => c.id === focusId); cols = 1; quality = 'main';
+      } else {
+        const pp = perPage();
+        page = Math.min(page, pageCount() - 1);
+        list = CAMS.slice(page * pp, page * pp + pp);
+        cols = Math.round(Math.sqrt(pp));
+        if (layoutSel.value === 'auto') {  // évite les cases vides inutiles en mode auto
+          cols = Math.ceil(Math.sqrt(Math.max(1, list.length)));
+        }
+        quality = list.length === 1 ? 'main' : 'sub';
+      }
+      const rows = Math.max(1, Math.ceil(Math.max(list.length, layoutSel.value === 'auto' || focusId !== null ? list.length : perPage()) / cols));
+      wall.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      wall.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+      list.forEach(c => {
+        const tile = document.createElement('div');
+        tile.className = 'wall-tile';
+        tile.title = focusId === null ? 'Double-clic pour agrandir' : 'Double-clic ou Échap pour revenir au mur';
+        tile.innerHTML = `<img alt=""><div class="overlay">Connexion…</div>
+          <div class="wall-label"><span class="wall-dot"></span><span></span></div>`;
+        tile.querySelector('.wall-label span:last-child').textContent = c.name + (c.location ? ' · ' + c.location : '');
+        tile.dataset.id = c.id;
+        tile.addEventListener('dblclick', () => { focusId = focusId === null ? c.id : null; render(); });
+        wall.appendChild(tile);
+        loops.push(Seelice.liveLoop(tile.querySelector('img'), tile.querySelector('.overlay'), c.id, quality,
+          () => status[c.id] !== false));
+      });
+      // Cases vides pour garder une grille régulière (disposition fixe)
+      if (focusId === null && layoutSel.value !== 'auto') {
+        for (let i = list.length; i < perPage(); i++) {
+          const empty = document.createElement('div'); empty.className = 'wall-tile empty'; wall.appendChild(empty);
+        }
+      }
+      paintStatus();
+      const pc = pageCount();
+      document.getElementById('page').textContent = focusId !== null ? 'Vue agrandie' : (pc > 1 ? `Page ${page + 1} / ${pc}` : '');
+      document.getElementById('prev').hidden = document.getElementById('next').hidden = focusId !== null || pc < 2;
+    }
+
+    function paintStatus() {
+      let on = 0;
+      CAMS.forEach(c => { if (status[c.id]) on++; });
+      document.getElementById('count').textContent = CAMS.length ? `${on} / ${CAMS.length} en ligne` : '';
+      wall.querySelectorAll('.wall-tile[data-id]').forEach(t => {
+        const ok = status[t.dataset.id];
+        t.classList.toggle('offline', ok === false);
+        if (ok === false) { const ov = t.querySelector('.overlay'); ov.textContent = 'HORS LIGNE'; ov.hidden = false; }
+      });
+    }
+
+    async function refreshStatus() {
+      try { status = await (await fetch('/api/status')).json(); } catch (e) { return; }
+      paintStatus();
+    }
+
+    function go(delta) { if (focusId !== null) return; page = (page + delta + pageCount()) % pageCount(); render(); }
+
+    function setCycle() {
+      clearInterval(cycleTimer);
+      const s = parseInt(cycleSel.value, 10);
+      if (s > 0) cycleTimer = setInterval(() => { if (focusId === null && pageCount() > 1) go(1); }, s * 1000);
+    }
+
+    layoutSel.addEventListener('change', () => { store.set('seelice-wall-layout', layoutSel.value); page = 0; render(); });
+    cycleSel.addEventListener('change', () => { store.set('seelice-wall-cycle', cycleSel.value); setCycle(); });
+    document.getElementById('prev').addEventListener('click', () => go(-1));
+    document.getElementById('next').addEventListener('click', () => go(1));
+    const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    document.getElementById('fs').addEventListener('click', toggleFs);
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'SELECT') return;
+      if (e.key === 'ArrowRight') go(1);
+      else if (e.key === 'ArrowLeft') go(-1);
+      else if (e.key === 'f' || e.key === 'F') toggleFs();
+      else if (e.key === 'Escape' && focusId !== null) { focusId = null; render(); }
+    });
+
+    // La barre se cache toute seule en plein écran, et réapparaît quand on bouge la souris
+    let hideTimer;
+    document.addEventListener('mousemove', () => {
+      document.body.classList.remove('idle'); clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { if (document.fullscreenElement) document.body.classList.add('idle'); }, 3000);
+    });
+    document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('idle'); });
+
+    const clock = document.getElementById('clock');
+    const tick = () => clock.textContent = new Date().toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    tick(); setInterval(tick, 1000);
+
+    render(); setCycle(); refreshStatus(); setInterval(refreshStatus, 10000);
+  </script>
+</body>
+</html>
