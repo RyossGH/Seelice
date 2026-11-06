@@ -31,6 +31,10 @@ class OnvifError(Exception):
     pass
 
 
+class OnvifAuthError(OnvifError):
+    pass
+
+
 def _local(tag):
     return tag.rsplit("}", 1)[-1]
 
@@ -64,6 +68,12 @@ class OnvifCamera:
         self.profile_token = None
         self.clock_offset = timedelta(0)
         self.ready = False
+        # Méthode d'authentification : "wsse" (jeton dans le SOAP), "digest" (HTTP Digest) ou "both"
+        self.auth_mode = "wsse"
+        pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        pwd_mgr.add_password(None, f"http://{ip}:{self.port}/", self.username, self.password)
+        self._digest_opener = urllib.request.build_opener(urllib.request.HTTPDigestAuthHandler(pwd_mgr))
+        self._plain_opener = urllib.request.build_opener()
 
     # ------------------------------------------------------------------ SOAP
     def _security_header(self):
@@ -81,20 +91,44 @@ class OnvifCamera:
         )
 
     def _call(self, url, body, auth=True):
+        if not auth or not self.username:
+            return self._send(url, body, wsse=False, digest=False)
+        try:
+            return self._send(url, body, wsse=self.auth_mode in ("wsse", "both"),
+                              digest=self.auth_mode in ("digest", "both"))
+        except OnvifAuthError:
+            if self.ready:
+                raise
+            # Pendant la connexion : on essaie les autres méthodes et on retient celle qui marche
+            for mode in ("digest", "both", "wsse"):
+                if mode == self.auth_mode:
+                    continue
+                try:
+                    root = self._send(url, body, wsse=mode in ("wsse", "both"), digest=mode in ("digest", "both"))
+                    self.auth_mode = mode
+                    return root
+                except OnvifAuthError:
+                    continue
+            raise
+
+    def _send(self, url, body, wsse, digest):
         envelope = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             f'<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" '
             f'xmlns:tds="{NS_DEVICE}" xmlns:trt="{NS_MEDIA}" xmlns:tptz="{NS_PTZ}" xmlns:tt="{NS_SCHEMA}">'
-            f"<s:Header>{self._security_header() if auth else ''}</s:Header>"
+            f"<s:Header>{self._security_header() if wsse else ''}</s:Header>"
             f"<s:Body>{body}</s:Body></s:Envelope>"
         ).encode("utf-8")
         req = urllib.request.Request(url, data=envelope, method="POST",
                                      headers={"Content-Type": "application/soap+xml; charset=utf-8"})
+        opener = self._digest_opener if digest else self._plain_opener
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with opener.open(req, timeout=self.timeout) as resp:
                 data = resp.read()
         except urllib.error.HTTPError as exc:
             data = exc.read()
+            if exc.code == 401 and b"Fault" not in (data or b""):
+                raise OnvifAuthError("identifiants refusés par la caméra (utilisateur / mot de passe)")
             if not data:
                 raise OnvifError(f"HTTP {exc.code} sur {urlparse(url).path}")
         except (urllib.error.URLError, OSError) as exc:
@@ -107,7 +141,7 @@ class OnvifCamera:
         if fault is not None:
             reason = _child_text(fault, "Text") or _child_text(fault, "Value") or "erreur inconnue"
             if "auth" in reason.lower() or "NotAuthorized" in ET.tostring(fault, encoding="unicode"):
-                raise OnvifError("identifiants refusés par la caméra (utilisateur / mot de passe)")
+                raise OnvifAuthError("identifiants refusés par la caméra (utilisateur / mot de passe)")
             raise OnvifError(f"la caméra a refusé la commande : {reason}")
         return root
 
