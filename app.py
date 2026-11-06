@@ -1,5 +1,5 @@
 """
-CamHub — mini VMS (gestion centralisée de caméras IP) pour lab réseau.
+Seelice — mini VMS (gestion centralisée de caméras IP) pour lab réseau.
 
 - Inventaire des caméras (SQLite)
 - Statut en ligne / hors ligne (test TCP du port RTSP)
@@ -38,12 +38,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 # --------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-DB_PATH = os.path.join(DATA_DIR, "camhub.db")
+DB_PATH = os.path.join(DATA_DIR, "seelice.db")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 CAPTURE_DIR = os.path.join(DATA_DIR, "captures")
-FFMPEG = os.environ.get("CAMHUB_FFMPEG", "ffmpeg")
-HOST = os.environ.get("CAMHUB_HOST", "0.0.0.0")
-PORT = int(os.environ.get("CAMHUB_PORT", "8080"))
+FFMPEG = os.environ.get("SEELICE_FFMPEG", "ffmpeg")
+HOST = os.environ.get("SEELICE_HOST", "0.0.0.0")
+PORT = int(os.environ.get("SEELICE_PORT", "8080"))
 
 os.makedirs(CAPTURE_DIR, exist_ok=True)
 
@@ -182,7 +182,7 @@ def setup():
             CONFIG["admin_hash"] = generate_password_hash(pw)
             save_config(CONFIG)
             session["auth"] = True
-            flash("Mot de passe admin créé. Bienvenue sur CamHub !", "ok")
+            flash("Mot de passe admin créé. Bienvenue sur Seelice !", "ok")
             return redirect(url_for("index"))
     return render_template("setup.html")
 
@@ -673,5 +673,5 @@ if __name__ == "__main__":
     except (FileNotFoundError, subprocess.CalledProcessError):
         print("[!] ffmpeg introuvable : la vue live ne marchera pas. "
               "Windows : winget install Gyan.FFmpeg  |  Linux : sudo apt install ffmpeg")
-    print(f"CamHub démarré -> http://localhost:{PORT}  (ou http://<ip-de-ce-pc>:{PORT} depuis le réseau)")
+    print(f"Seelice démarré -> http://localhost:{PORT}  (ou http://<ip-de-ce-pc>:{PORT} depuis le réseau)")
     app.run(host=HOST, port=PORT, threaded=True, debug=False)

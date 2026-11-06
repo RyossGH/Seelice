@@ -1,5 +1,5 @@
-// CamHub — fonctions partagées
-const CamHub = (() => {
+// Seelice — fonctions partagées
+const Seelice = (() => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   /**

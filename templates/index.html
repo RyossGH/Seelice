@@ -57,17 +57,17 @@
   const state = { live: true, status: {} };
   const toggle = document.getElementById('live-toggle');
   if (toggle) {
-    toggle.checked = localStorage.getItem('camhub-live') !== '0';
+    toggle.checked = localStorage.getItem('seelice-live') !== '0';
     state.live = toggle.checked;
     toggle.addEventListener('change', () => {
       state.live = toggle.checked;
-      try { localStorage.setItem('camhub-live', state.live ? '1' : '0'); } catch (e) {}
+      try { localStorage.setItem('seelice-live', state.live ? '1' : '0'); } catch (e) {}
     });
   }
 
   document.querySelectorAll('.card').forEach(card => {
     const id = card.dataset.id;
-    CamHub.liveLoop(card.querySelector('img'), card.querySelector('.overlay'), id, 'sub',
+    Seelice.liveLoop(card.querySelector('img'), card.querySelector('.overlay'), id, 'sub',
       () => state.live && state.status[id] !== false && !card.hidden);
   });
 
@@ -93,6 +93,6 @@
     document.querySelectorAll('.card').forEach(c => c.hidden = filter.value && c.dataset.location !== filter.value);
   });
 
-  CamHub.bindCaptureButtons();
+  Seelice.bindCaptureButtons();
 </script>
 {% endblock %}

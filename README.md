@@ -1,6 +1,15 @@
-# CamHub — gestion centralisée de caméras IP (lab)
+# Seelice *(prononcez « silice »)*
 
-Mini-VMS web pour centraliser des caméras IP sur un réseau : inventaire, statut, mosaïque live, plein écran, captures, découverte réseau.
+Seelice centralise toutes les caméras IP d'un réseau dans une seule interface web, quelle que soit leur marque.
+On branche les caméras, Seelice les détecte, et tout se pilote depuis un navigateur : mosaïque en direct,
+plein écran HD, captures, statut en temps réel.
+
+Pensé par des techniciens réseau, Seelice met l'accent sur une installation propre et sécurisée :
+caméras isolées dans leur VLAN, aucun port ouvert sur Internet, accès protégé.
+
+> *La silice, c'est le verre des objectifs et des fibres optiques. Seelice, c'est voir clair sur tout votre réseau.*
+
+**Stack :** Python · Flask · SQLite · ffmpeg — **Marques préréglées :** Hikvision, Dahua, Reolink, TP-Link Tapo/VIGI, Uniview, Axis + tout flux RTSP/ONVIF.
 
 ## Installation (Windows)
 
@@ -31,11 +40,11 @@ Si Windows demande l'autorisation du pare-feu, accepte pour les **réseaux priv�
   20 s après que plus personne ne regarde.
 - La mosaïque utilise le **flux secondaire** (basse résolution), le plein écran le **flux principal** (HD).
 - Le statut en ligne / hors ligne = test de connexion TCP sur le port RTSP, toutes les 10 s.
-- Données dans `data/` : `camhub.db` (SQLite), `config.json` (mot de passe admin haché), `captures/`.
+- Données dans `data/` : `seelice.db` (SQLite), `config.json` (mot de passe admin haché), `captures/`.
 
 ## Sécurité (à garder en tête)
 
-- Les mots de passe des caméras sont stockés **en clair** dans `data/camhub.db` (ffmpeg en a besoin) → protège ce dossier.
+- Les mots de passe des caméras sont stockés **en clair** dans `data/seelice.db` (ffmpeg en a besoin) → protège ce dossier.
 - Serveur web de développement Flask, en HTTP : **réseau local uniquement**, ne jamais l'exposer sur Internet
   (pas de redirection de port sur la box). Pour l'accès à distance → VPN (WireGuard).
 - Bonne pratique « client » : caméras dans un VLAN dédié, sans accès Internet, mot de passe unique par caméra.
