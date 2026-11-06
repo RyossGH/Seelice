@@ -53,6 +53,7 @@ Si Windows demande l'autorisation du pare-feu, accepte pour les **réseaux priv�
 
 - Enregistrement continu / sur détection (segments ffmpeg + rétention 30 jours)
 - Détection IA de personnes / véhicules (Frigate ou YOLO) + notifications téléphone
+- ~~Pilotage des caméras motorisées (PTZ ONVIF)~~ ✅ fait
 - Comptes utilisateurs avec droits (admin / lecture seule)
 - Supervision des switchs PoE (SNMP : port, consommation, redémarrage d'une caméra à distance)
 - Export de la fiche d'installation (plan d'adressage, VLAN, ports) en PDF pour le client

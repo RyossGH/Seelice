@@ -22,7 +22,33 @@
     <div class="overlay" id="overlay">Connexion…</div>
     <div class="fps" id="fps"></div>
   </div>
-  <aside class="panel info">
+  <aside class="side">
+  {% if cam.brand != 'demo' %}
+  <div class="panel ptz" id="ptz">
+    <h2>Pilotage <span class="muted small" id="ptz-state">recherche ONVIF…</span></h2>
+    <div id="ptz-controls" hidden>
+      <div class="ptz-pad">
+        <span></span><button data-dir="0,1" title="Haut (↑)">▲</button><span></span>
+        <button data-dir="-1,0" title="Gauche (←)">◀</button>
+        <button id="ptz-home" title="Position d'origine">⌂</button>
+        <button data-dir="1,0" title="Droite (→)">▶</button>
+        <span></span><button data-dir="0,-1" title="Bas (↓)">▼</button><span></span>
+      </div>
+      <div class="ptz-zoom">
+        <button data-zoom="-1" title="Dézoomer (-)">−</button><span>Zoom</span><button data-zoom="1" title="Zoomer (+)">+</button>
+      </div>
+      <label class="ptz-speed">Vitesse <input type="range" id="ptz-speed" min="0.1" max="1" step="0.1" value="0.5"></label>
+      <h3>Positions enregistrées</h3>
+      <div class="ptz-presets" id="ptz-presets"></div>
+      <div class="inline">
+        <input id="preset-name" placeholder="Nom (ex. Portail)" maxlength="40">
+        <button class="btn small" id="preset-save">Mémoriser</button>
+      </div>
+      <p class="muted small">Maintiens une flèche pour faire tourner la caméra. Clavier : flèches, + et −.</p>
+    </div>
+  </div>
+  {% endif %}
+  <div class="panel info">
     <h2>Fiche caméra</h2>
     <dl>
       <dt>Marque</dt><dd>{{ brands[cam.brand].label if cam.brand in brands else cam.brand }}</dd>
@@ -37,6 +63,7 @@
       {% if cam.notes %}<dt>Notes</dt><dd>{{ cam.notes }}</dd>{% endif %}
     </dl>
     {% if cam.brand != 'demo' %}<p class="muted small">Astuce : colle l'URL RTSP dans VLC (Média → Ouvrir un flux réseau) pour vérifier un flux en dehors de Seelice.</p>{% endif %}
+  </div>
   </aside>
 </div>
 {% endblock %}
@@ -62,5 +89,77 @@
   }
   refresh(); setInterval(refresh, 10000);
   Seelice.bindCaptureButtons();
+
+  // ---------------- Pilotage PTZ (ONVIF) ----------------
+  const ptzBox = document.getElementById('ptz');
+  if (ptzBox) {
+    const api = `/api/cameras/${camId}/ptz`;
+    const stateEl = document.getElementById('ptz-state');
+    const speed = document.getElementById('ptz-speed');
+    let moving = false;
+
+    const send = async (payload) => {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { Seelice.toast('Pilotage : ' + (data.error || 'erreur'), true); throw new Error(data.error); }
+      return data;
+    };
+    const start = (pan, tilt, zoom) => {
+      if (moving) return; moving = true;
+      const v = parseFloat(speed.value);
+      send({ action: 'move', pan: pan * v, tilt: tilt * v, zoom: zoom * v }).catch(() => {});
+    };
+    const stop = () => { if (!moving) return; moving = false; send({ action: 'stop' }).catch(() => {}); };
+
+    function renderPresets(list) {
+      const box = document.getElementById('ptz-presets');
+      box.innerHTML = '';
+      if (!list.length) { box.innerHTML = '<span class="muted small">Aucune position mémorisée.</span>'; return; }
+      list.forEach(p => {
+        const b = document.createElement('button');
+        b.className = 'btn small'; b.textContent = p.name;
+        b.addEventListener('click', () => send({ action: 'goto', token: p.token }).catch(() => {}));
+        box.appendChild(b);
+      });
+    }
+
+    const bindHold = (el, fn) => {
+      el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); fn(); });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, stop));
+    };
+    document.querySelectorAll('[data-dir]').forEach(b => {
+      const [x, y] = b.dataset.dir.split(',').map(Number);
+      bindHold(b, () => start(x, y, 0));
+    });
+    document.querySelectorAll('[data-zoom]').forEach(b => bindHold(b, () => start(0, 0, Number(b.dataset.zoom))));
+    document.getElementById('ptz-home').addEventListener('click', () => send({ action: 'home' }).catch(() => {}));
+    document.getElementById('preset-save').addEventListener('click', async () => {
+      const input = document.getElementById('preset-name');
+      try {
+        const d = await send({ action: 'save', name: input.value });
+        renderPresets(d.presets || []); input.value = ''; Seelice.toast('Position mémorisée');
+      } catch (e) {}
+    });
+
+    const KEYS = { ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], '+': [0, 0, 1], '-': [0, 0, -1] };
+    let ptzReady = false;
+    document.addEventListener('keydown', e => {
+      if (!ptzReady || e.repeat || e.target.tagName === 'INPUT' || !KEYS[e.key]) return;
+      e.preventDefault(); start(...KEYS[e.key]);
+    });
+    document.addEventListener('keyup', e => { if (KEYS[e.key]) stop(); });
+    window.addEventListener('blur', stop);
+
+    fetch(api).then(r => r.json()).then(d => {
+      if (d.supported) {
+        ptzReady = true;
+        stateEl.textContent = '';
+        document.getElementById('ptz-controls').hidden = false;
+        renderPresets(d.presets || []);
+      } else {
+        stateEl.textContent = d.error ? '— ' + d.error : '— caméra fixe (non motorisée)';
+      }
+    }).catch(() => { stateEl.textContent = '— indisponible'; });
+  }
 </script>
 {% endblock %}

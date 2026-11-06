@@ -33,6 +33,8 @@ from flask import (Flask, Response, abort, flash, g, jsonify, redirect,
                    url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import onvif
+
 # --------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------
@@ -141,6 +143,10 @@ def close_db(_exc):
 
 with db_connect() as _c:
     _c.executescript(SCHEMA)
+    # Migrations douces pour les bases créées par une version précédente
+    _cols = {r[1] for r in _c.execute("PRAGMA table_info(cameras)")}
+    if "onvif_port" not in _cols:
+        _c.execute("ALTER TABLE cameras ADD COLUMN onvif_port INTEGER NOT NULL DEFAULT 80")
 
 
 def all_cameras():
@@ -503,6 +509,12 @@ def _form_to_camera(form, existing=None):
         "vlan": form.get("vlan", "").strip(),
         "notes": form.get("notes", "").strip(),
     }
+    try:
+        data["onvif_port"] = int(form.get("onvif_port") or 80)
+        if not 1 <= data["onvif_port"] <= 65535:
+            raise ValueError
+    except ValueError:
+        data["onvif_port"] = 80
     errors = []
     if not data["name"]:
         errors.append("Le nom est obligatoire.")
@@ -549,7 +561,7 @@ def camera_new():
         cam = {"name": request.args.get("name", ""), "brand": brand if brand in BRANDS else "custom",
                "ip": request.args.get("ip", ""), "rtsp_port": preset["port"] or 554,
                "username": "admin", "password": "", "main_path": preset["main"],
-               "sub_path": preset["sub"], "location": "", "vlan": "", "notes": ""}
+               "sub_path": preset["sub"], "location": "", "vlan": "", "notes": "", "onvif_port": 80}
     return render_template("camera_form.html", cam=cam, brands=BRANDS, editing=False)
 
 
@@ -564,6 +576,7 @@ def camera_edit(cam_id):
             get_db().execute(f"UPDATE cameras SET {sets} WHERE id = ?", (*data.values(), cam_id))
             get_db().commit()
             stop_streams_for(cam_id)  # pour relancer le flux avec les nouveaux paramètres
+            onvif.forget(cam_id)
             flash(f"Caméra « {data['name']} » modifiée.", "ok")
             return redirect(url_for("index"))
         for e in errors:
@@ -579,6 +592,7 @@ def camera_edit(cam_id):
 def camera_delete(cam_id):
     cam = get_camera(cam_id)
     stop_streams_for(cam_id)
+    onvif.forget(cam_id)
     get_db().execute("DELETE FROM cameras WHERE id = ?", (cam_id,))
     get_db().commit()
     flash(f"Caméra « {cam['name']} » supprimée.", "ok")
@@ -646,6 +660,60 @@ def api_capture(cam_id):
     with open(os.path.join(CAPTURE_DIR, filename), "wb") as f:
         f.write(frame)
     return jsonify(file=filename, url=url_for("capture_file", filename=filename))
+
+
+# --- Caméras motorisées (PTZ) via ONVIF -----------------------------------
+def _ptz_camera(cam_id):
+    cam = get_camera(cam_id)
+    if cam["brand"] == "demo":
+        raise onvif.OnvifError("la caméra de démo n'est pas motorisée")
+    return onvif.get_onvif(cam)
+
+
+def _clamp(v, lo=-1.0, hi=1.0):
+    try:
+        return max(lo, min(hi, float(v)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@app.route("/api/cameras/<int:cam_id>/ptz")
+@login_required
+def api_ptz_info(cam_id):
+    try:
+        oc = _ptz_camera(cam_id)
+        presets = oc.presets() if oc.has_ptz else []
+        return jsonify(supported=oc.has_ptz, presets=presets)
+    except onvif.OnvifError as exc:
+        onvif.forget(cam_id)
+        return jsonify(supported=False, presets=[], error=str(exc))
+
+
+@app.route("/api/cameras/<int:cam_id>/ptz", methods=["POST"])
+@login_required
+def api_ptz_command(cam_id):
+    body = request.get_json(silent=True) or {}
+    action = body.get("action")
+    try:
+        oc = _ptz_camera(cam_id)
+        if action == "move":
+            oc.move(_clamp(body.get("pan")), _clamp(body.get("tilt")), _clamp(body.get("zoom")))
+        elif action == "stop":
+            oc.stop()
+        elif action == "home":
+            oc.home()
+        elif action == "goto":
+            oc.goto_preset(body.get("token", ""))
+        elif action == "save":
+            name = str(body.get("name", "")).strip()[:40] or datetime.now().strftime("Position %H:%M")
+            oc.set_preset(name)
+            return jsonify(ok=True, presets=oc.presets())
+        else:
+            return jsonify(error="action inconnue"), 400
+        return jsonify(ok=True)
+    except onvif.OnvifError as exc:
+        onvif.forget(cam_id)
+        return jsonify(error=str(exc)), 502
 
 
 @app.route("/api/discover")

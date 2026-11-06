@@ -157,3 +157,21 @@ body.idle .wall-bar { margin-top: -60px; opacity: 0; }
 .wall-tile.offline .wall-dot { background: var(--bad); box-shadow: 0 0 6px var(--bad); }
 .wall-empty { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
 .wall-empty a { pointer-events: auto; }
+
+/* Pilotage PTZ */
+.side { display: flex; flex-direction: column; gap: 16px; }
+.ptz h2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.ptz h3 { font-size: 13.5px; color: var(--muted); font-weight: 500; margin: 16px 0 8px; }
+.ptz-pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 6px; justify-content: center; margin: 6px 0 12px; }
+.ptz-pad button, .ptz-zoom button { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+  font-size: 20px; cursor: pointer; user-select: none; touch-action: none; }
+.ptz-pad button:hover, .ptz-zoom button:hover { border-color: var(--accent); }
+.ptz-pad button:active, .ptz-zoom button:active { background: var(--accent); border-color: var(--accent); }
+#ptz-home { font-size: 22px; color: var(--muted); }
+.ptz-zoom { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.ptz-zoom button { width: 48px; height: 40px; }
+.ptz-zoom span { color: var(--muted); font-size: 13px; }
+.ptz-speed { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; }
+.ptz-speed input { margin: 0; padding: 0; accent-color: var(--accent); }
+.ptz-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+#ptz-state { font-weight: 400; }

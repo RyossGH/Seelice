@@ -21,6 +21,7 @@
   <div class="row hw">
     <label>Adresse IP<input name="ip" value="{{ cam.ip if cam.ip != 'demo' }}" placeholder="192.168.1.64"></label>
     <label class="narrow">Port RTSP<input name="rtsp_port" type="number" min="1" max="65535" value="{{ cam.rtsp_port or 554 }}"></label>
+    <label class="narrow">Port ONVIF<input name="onvif_port" type="number" min="1" max="65535" value="{{ cam.onvif_port or 80 }}" title="Sert au pilotage des caméras motorisées (souvent 80, parfois 8080 ou 8000)"></label>
   </div>
   <div class="row hw">
     <label>Utilisateur<input name="username" value="{{ cam.username }}" autocomplete="off"></label>
