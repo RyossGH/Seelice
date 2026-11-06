@@ -54,6 +54,8 @@ BRANDS = {
     "dahua": {"label": "Dahua / Imou / Lorex", "port": 554,
               "main": "/cam/realmonitor?channel=1&subtype=0",
               "sub": "/cam/realmonitor?channel=1&subtype=1"},
+    "hanwha": {"label": "Wisenet / Hanwha / Samsung", "port": 554,
+               "main": "/profile2/media.smp", "sub": "/profile3/media.smp"},
     "reolink": {"label": "Reolink", "port": 554,
                 "main": "/h264Preview_01_main", "sub": "/h264Preview_01_sub"},
     "tapo": {"label": "TP-Link Tapo / VIGI", "port": 554,
@@ -368,7 +370,8 @@ def camera_online(cam):
 def guess_brand(text):
     t = text.lower()
     for needle, brand in (("hikvision", "hikvision"), ("hilook", "hikvision"), ("dahua", "dahua"),
-                          ("imou", "dahua"), ("reolink", "reolink"), ("tp-link", "tapo"),
+                          ("imou", "dahua"), ("wisenet", "hanwha"), ("hanwha", "hanwha"),
+                          ("samsung", "hanwha"),("reolink", "reolink"), ("tp-link", "tapo"),
                           ("tapo", "tapo"), ("vigi", "tapo"), ("uniview", "uniview"), ("axis", "axis")):
         if needle in t:
             return brand

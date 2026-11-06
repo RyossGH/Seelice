@@ -9,7 +9,7 @@ caméras isolées dans leur VLAN, aucun port ouvert sur Internet, accès protég
 
 > *La silice, c'est le verre des objectifs et des fibres optiques. Seelice, c'est voir clair sur tout votre réseau.*
 
-**Stack :** Python · Flask · SQLite · ffmpeg — **Marques préréglées :** Hikvision, Dahua, Reolink, TP-Link Tapo/VIGI, Uniview, Axis + tout flux RTSP/ONVIF.
+**Stack :** Python · Flask · SQLite · ffmpeg — **Marques préréglées :** Hikvision, Dahua, Wisenet (Hanwha), Reolink, TP-Link Tapo/VIGI, Uniview, Axis + tout flux RTSP/ONVIF.
 
 ## Installation (Windows)
 
