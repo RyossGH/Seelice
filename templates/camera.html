@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ cam.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="muted" href="{{ url_for('index') }}">← Toutes les caméras</a>
+    <h1>{{ cam.name }} <span class="badge pending" id="badge">…</span></h1>
+  </div>
+  <div class="head-actions">
+    <div class="seg" id="quality">
+      <button data-q="main" class="active">HD</button><button data-q="sub">Léger</button>
+    </div>
+    <button class="btn" data-capture="{{ cam.id }}">Capture</button>
+    <button class="btn" id="fullscreen">Plein écran</button>
+    <a class="btn" href="{{ url_for('camera_edit', cam_id=cam.id) }}">Modifier</a>
+  </div>
+</div>
+
+<div class="viewer-layout">
+  <div class="viewer" id="viewer">
+    <img id="live" alt="">
+    <div class="overlay" id="overlay">Connexion…</div>
+    <div class="fps" id="fps"></div>
+  </div>
+  <aside class="panel info">
+    <h2>Fiche caméra</h2>
+    <dl>
+      <dt>Marque</dt><dd>{{ brands[cam.brand].label if cam.brand in brands else cam.brand }}</dd>
+      <dt>Adresse IP</dt><dd>{{ cam.ip }}{% if cam.brand != 'demo' %} : {{ cam.rtsp_port }}{% endif %}</dd>
+      {% if cam.location %}<dt>Emplacement</dt><dd>{{ cam.location }}</dd>{% endif %}
+      {% if cam.vlan %}<dt>VLAN</dt><dd>{{ cam.vlan }}</dd>{% endif %}
+      {% if cam.brand != 'demo' %}
+      <dt>Flux principal</dt><dd><code>{{ rtsp_main }}</code></dd>
+      <dt>Flux secondaire</dt><dd><code>{{ rtsp_sub }}</code></dd>
+      <dt>Interface web</dt><dd><a href="http://{{ cam.ip }}" target="_blank" rel="noopener">http://{{ cam.ip }}</a></dd>
+      {% endif %}
+      {% if cam.notes %}<dt>Notes</dt><dd>{{ cam.notes }}</dd>{% endif %}
+    </dl>
+    {% if cam.brand != 'demo' %}<p class="muted small">Astuce : colle l'URL RTSP dans VLC (Média → Ouvrir un flux réseau) pour vérifier un flux en dehors de CamHub.</p>{% endif %}
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const camId = {{ cam.id }};
+  let quality = 'main', online = true;
+  const loop = CamHub.liveLoop(document.getElementById('live'), document.getElementById('overlay'),
+    camId, () => quality, () => online, document.getElementById('fps'));
+
+  document.querySelectorAll('#quality button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#quality button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); quality = b.dataset.q; loop.reset();
+  }));
+  document.getElementById('fullscreen').addEventListener('click', () => document.getElementById('viewer').requestFullscreen());
+
+  async function refresh() {
+    try { const s = await (await fetch('/api/status')).json(); online = !!s[camId]; } catch (e) { return; }
+    const b = document.getElementById('badge');
+    b.className = 'badge ' + (online ? 'on' : 'off'); b.textContent = online ? 'En ligne' : 'Hors ligne';
+    if (!online) { const ov = document.getElementById('overlay'); ov.textContent = 'Hors ligne'; ov.hidden = false; }
+  }
+  refresh(); setInterval(refresh, 10000);
+  CamHub.bindCaptureButtons();
+</script>
+{% endblock %}

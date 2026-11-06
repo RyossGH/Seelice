@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Caméras{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Caméras</h1>
+    <p class="muted"><span id="summary">{{ cameras|length }} caméra(s)</span></p>
+  </div>
+  <div class="head-actions">
+    <label class="switch"><input type="checkbox" id="live-toggle" checked><span></span>Live</label>
+    <select id="group-filter">
+      <option value="">Tous les emplacements</option>
+      {% for loc in cameras|map(attribute='location')|unique|sort if loc %}<option>{{ loc }}</option>{% endfor %}
+    </select>
+    <a class="btn primary" href="{{ url_for('camera_new') }}">+ Ajouter une caméra</a>
+  </div>
+</div>
+
+{% if not cameras %}
+<div class="panel empty">
+  <h2>Aucune caméra pour l'instant</h2>
+  <p class="muted">Commence par <a href="{{ url_for('scan_page') }}">scanner ton réseau</a> pour trouver tes caméras,
+  ou ajoute une <a href="{{ url_for('camera_new', brand='demo', name='Démo') }}">caméra de démo</a> pour tester l'interface sans matériel.</p>
+</div>
+{% else %}
+<div class="grid" id="grid">
+  {% for c in cameras %}
+  <article class="card" data-id="{{ c.id }}" data-location="{{ c.location }}">
+    <a class="thumb" href="{{ url_for('camera_view', cam_id=c.id) }}">
+      <img alt="">
+      <div class="overlay">Connexion…</div>
+      <span class="badge pending">…</span>
+    </a>
+    <div class="meta">
+      <div>
+        <strong>{{ c.name }}</strong>
+        <small>{{ c.ip }}{% if c.location %} · {{ c.location }}{% endif %}{% if c.vlan %} · VLAN {{ c.vlan }}{% endif %}</small>
+      </div>
+      <span class="tag">{{ {'demo': 'Démo', 'custom': 'RTSP'}.get(c.brand, brands[c.brand].label.split(' ')[0] if c.brand in brands else c.brand) }}</span>
+    </div>
+    <div class="actions">
+      <button class="btn small" data-capture="{{ c.id }}">Capture</button>
+      <a class="btn small" href="{{ url_for('camera_edit', cam_id=c.id) }}">Modifier</a>
+      <form method="post" action="{{ url_for('camera_delete', cam_id=c.id) }}"
+            onsubmit="return confirm('Supprimer la caméra « {{ c.name }} » ?')">
+        <button class="btn small danger">Supprimer</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const state = { live: true, status: {} };
+  const toggle = document.getElementById('live-toggle');
+  if (toggle) {
+    toggle.checked = localStorage.getItem('camhub-live') !== '0';
+    state.live = toggle.checked;
+    toggle.addEventListener('change', () => {
+      state.live = toggle.checked;
+      try { localStorage.setItem('camhub-live', state.live ? '1' : '0'); } catch (e) {}
+    });
+  }
+
+  document.querySelectorAll('.card').forEach(card => {
+    const id = card.dataset.id;
+    CamHub.liveLoop(card.querySelector('img'), card.querySelector('.overlay'), id, 'sub',
+      () => state.live && state.status[id] !== false && !card.hidden);
+  });
+
+  async function refreshStatus() {
+    try {
+      state.status = await (await fetch('/api/status')).json();
+    } catch (e) { return; }
+    let on = 0, total = 0;
+    document.querySelectorAll('.card').forEach(card => {
+      const ok = state.status[card.dataset.id];
+      const b = card.querySelector('.badge');
+      b.className = 'badge ' + (ok ? 'on' : 'off');
+      b.textContent = ok ? 'En ligne' : 'Hors ligne';
+      if (!ok) { const ov = card.querySelector('.overlay'); ov.textContent = 'Hors ligne'; ov.hidden = false; }
+      total++; if (ok) on++;
+    });
+    document.getElementById('summary').textContent = `${on} / ${total} caméra(s) en ligne`;
+  }
+  refreshStatus(); setInterval(refreshStatus, 10000);
+
+  const filter = document.getElementById('group-filter');
+  if (filter) filter.addEventListener('change', () => {
+    document.querySelectorAll('.card').forEach(c => c.hidden = filter.value && c.dataset.location !== filter.value);
+  });
+
+  CamHub.bindCaptureButtons();
+</script>
+{% endblock %}

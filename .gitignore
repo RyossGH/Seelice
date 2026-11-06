@@ -1,0 +1,6 @@
+# Données locales (base, mots de passe, captures)
+data/
+__pycache__/
+*.pyc
+.venv/
+.env

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Captures{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Captures</h1>
+    <p class="muted">{{ files|length }} capture(s) — stockées dans le dossier <code>data/captures</code>.</p>
+  </div>
+</div>
+{% if not files %}
+<div class="panel empty"><p class="muted">Aucune capture. Clique sur « Capture » sur une caméra pour en prendre une.</p></div>
+{% else %}
+<div class="grid captures">
+  {% for f in files %}
+  <a class="card" href="{{ url_for('capture_file', filename=f) }}" target="_blank">
+    <div class="thumb"><img src="{{ url_for('capture_file', filename=f) }}" loading="lazy" alt="{{ f }}"></div>
+    <div class="meta"><small>{{ f }}</small></div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

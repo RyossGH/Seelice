@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Premier lancement{% endblock %}
+{% block main_class %}auth{% endblock %}
+{% block content %}
+<form method="post" class="panel auth-box">
+  <div class="logo big"><span class="dot"></span>CamHub</div>
+  <h1>Premier lancement</h1>
+  <p class="muted">Choisis le mot de passe administrateur de l'interface (8 caractères minimum).</p>
+  <label>Mot de passe<input type="password" name="password" required minlength="8" autofocus></label>
+  <label>Confirmer<input type="password" name="confirm" required minlength="8"></label>
+  <button class="btn primary wide">Créer et entrer</button>
+</form>
+{% endblock %}

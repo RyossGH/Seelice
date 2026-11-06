@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier' if editing else 'Ajouter' }} une caméra{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="muted" href="{{ url_for('index') }}">← Toutes les caméras</a>
+    <h1>{{ 'Modifier « ' ~ cam.name ~ ' »' if editing else 'Ajouter une caméra' }}</h1>
+  </div>
+</div>
+
+<form method="post" class="panel form" id="cam-form">
+  <div class="row">
+    <label>Nom<input name="name" value="{{ cam.name }}" required placeholder="Ex. Entrée principale"></label>
+    <label>Marque / type
+      <select name="brand" id="brand">
+        {% for key, b in brands.items() %}<option value="{{ key }}" {{ 'selected' if key == cam.brand }}>{{ b.label }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="row hw">
+    <label>Adresse IP<input name="ip" value="{{ cam.ip if cam.ip != 'demo' }}" placeholder="192.168.1.64"></label>
+    <label class="narrow">Port RTSP<input name="rtsp_port" type="number" min="1" max="65535" value="{{ cam.rtsp_port or 554 }}"></label>
+  </div>
+  <div class="row hw">
+    <label>Utilisateur<input name="username" value="{{ cam.username }}" autocomplete="off"></label>
+    <label>Mot de passe
+      <input name="password" type="password" autocomplete="new-password"
+             placeholder="{{ 'Laisser vide pour ne pas changer' if editing else '' }}">
+    </label>
+  </div>
+  <div class="row hw">
+    <label>Chemin flux principal (HD)<input name="main_path" id="main_path" value="{{ cam.main_path }}" placeholder="/Streaming/Channels/101"></label>
+    <label>Chemin flux secondaire (léger)<input name="sub_path" id="sub_path" value="{{ cam.sub_path }}" placeholder="optionnel"></label>
+  </div>
+  <p class="muted small hw">Les chemins sont pré-remplis selon la marque. Le flux secondaire (basse résolution) sert à la mosaïque : il économise beaucoup de CPU et de bande passante.</p>
+
+  <div class="row">
+    <label>Emplacement<input name="location" value="{{ cam.location }}" placeholder="Ex. Atelier, Parking, Bureau"></label>
+    <label class="narrow">VLAN<input name="vlan" value="{{ cam.vlan }}" placeholder="Ex. 20"></label>
+  </div>
+  <label>Notes<textarea name="notes" rows="2" placeholder="Modèle exact, port du switch, date de pose…">{{ cam.notes }}</textarea></label>
+
+  <div class="form-actions">
+    <a class="btn" href="{{ url_for('index') }}">Annuler</a>
+    <button class="btn primary">{{ 'Enregistrer' if editing else 'Ajouter la caméra' }}</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const BRANDS = {{ brands|tojson }};
+  const brand = document.getElementById('brand');
+  const form = document.getElementById('cam-form');
+  function applyBrand(prefill) {
+    const isDemo = brand.value === 'demo';
+    form.querySelectorAll('.hw').forEach(el => el.hidden = isDemo);
+    if (!prefill) return;
+    const p = BRANDS[brand.value];
+    if (p.main || brand.value === 'custom') {
+      document.getElementById('main_path').value = p.main;
+      document.getElementById('sub_path').value = p.sub;
+      if (p.port) form.rtsp_port.value = p.port;
+    }
+  }
+  brand.addEventListener('change', () => applyBrand(true));
+  applyBrand(false);
+</script>
+{% endblock %}

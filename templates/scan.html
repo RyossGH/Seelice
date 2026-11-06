@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Scanner le réseau{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Scanner le réseau</h1>
+    <p class="muted">Trouve les caméras branchées sur ton réseau, puis ajoute-les en un clic.</p>
+  </div>
+</div>
+
+<div class="scan-cards">
+  <div class="panel">
+    <h2>Découverte ONVIF</h2>
+    <p class="muted small">Envoie une requête multicast WS-Discovery : les caméras ONVIF répondent avec leur IP, leur nom et leur modèle,
+      <strong>même si elles sont dans un autre sous-réseau</strong> (pratique juste après un reset usine).</p>
+    <button class="btn primary" id="btn-onvif">Lancer la découverte</button>
+  </div>
+  <div class="panel">
+    <h2>Scan du sous-réseau</h2>
+    <p class="muted small">Teste le port RTSP 554 sur chaque adresse du sous-réseau (max /22). Utile si l'ONVIF est désactivé.</p>
+    <div class="inline">
+      <input id="subnet" value="{{ subnet }}">
+      <button class="btn primary" id="btn-sweep">Scanner</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="results-panel" hidden>
+  <h2 id="results-title">Résultats</h2>
+  <table class="table">
+    <thead><tr><th>IP</th><th>Nom / modèle</th><th>Marque devinée</th><th>Source</th><th></th></tr></thead>
+    <tbody id="results"></tbody>
+  </table>
+  <p class="muted small" id="results-hint"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const BRANDS = {{ brands|tojson }};
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function run(btn, url, title) {
+    const panel = document.getElementById('results-panel'), tbody = document.getElementById('results');
+    const label = btn.textContent; btn.disabled = true; btn.textContent = 'Recherche…';
+    panel.hidden = false; document.getElementById('results-title').textContent = title;
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Recherche en cours…</td></tr>';
+    document.getElementById('results-hint').textContent = '';
+    try {
+      const data = await (await fetch(url)).json();
+      if (data.error) throw new Error(data.error);
+      const res = data.results;
+      if (!res.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">Aucune caméra trouvée. Vérifie le câblage, le PoE et que le PC est sur le même réseau.</td></tr>';
+        return;
+      }
+      let foreign = false;
+      tbody.innerHTML = res.map(r => {
+        const other = r.announced_ip && r.announced_ip !== r.ip ? ` <span class="tag warn">annonce ${esc(r.announced_ip)}</span>` : '';
+        if (other) foreign = true;
+        const params = new URLSearchParams({ ip: r.ip, brand: r.brand, name: r.name || r.hardware || '' });
+        const action = r.known ? '<span class="tag">Déjà ajoutée</span>'
+          : `<a class="btn small primary" href="/cameras/new?${params}">Ajouter</a>`;
+        const web = r.http !== false ? ` <a class="small" href="http://${esc(r.ip)}" target="_blank" rel="noopener">page web</a>` : '';
+        return `<tr><td><code>${esc(r.ip)}</code>${other}${web}</td>
+          <td>${esc(r.name)}${r.hardware ? ' <span class="muted">' + esc(r.hardware) + '</span>' : ''}</td>
+          <td>${esc((BRANDS[r.brand] || {}).label || r.brand)}</td><td>${esc(r.source)}</td><td>${action}</td></tr>`;
+      }).join('');
+      document.getElementById('results-hint').textContent = foreign
+        ? "Une caméra annonce une IP différente : elle est probablement dans un autre sous-réseau. Change son IP avec l'outil du constructeur (SADP, ConfigTool…) ou depuis sa page web."
+        : `${res.length} appareil(s) trouvé(s).`;
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="5" class="error-text">Erreur : ${esc(e.message)}</td></tr>`;
+    } finally { btn.disabled = false; btn.textContent = label; }
+  }
+
+  document.getElementById('btn-onvif').addEventListener('click', e => run(e.target, '/api/discover', 'Caméras ONVIF détectées'));
+  document.getElementById('btn-sweep').addEventListener('click', e =>
+    run(e.target, '/api/sweep?subnet=' + encodeURIComponent(document.getElementById('subnet').value), 'Appareils avec le port 554 ouvert'));
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CamHub{% endblock %} · CamHub</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23ef4444'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% if session.get('auth') %}
+  <header class="topbar">
+    <a class="logo" href="{{ url_for('index') }}"><span class="dot"></span>CamHub</a>
+    <nav>
+      <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint in ('index','camera_view') }}">Caméras</a>
+      <a href="{{ url_for('scan_page') }}" class="{{ 'active' if request.endpoint == 'scan_page' }}">Scanner le réseau</a>
+      <a href="{{ url_for('captures_page') }}" class="{{ 'active' if request.endpoint == 'captures_page' }}">Captures</a>
+      <a href="{{ url_for('logout') }}" class="muted">Déconnexion</a>
+    </nav>
+  </header>
+  {% endif %}
+  <main class="{% block main_class %}container{% endblock %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
