@@ -1,0 +1,6 @@
+legacy/
+local/
+dist/
+coverage/
+package-lock.json
+*.md

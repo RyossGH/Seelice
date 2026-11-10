@@ -1,6 +1,15 @@
-# Données locales (base, mots de passe, captures)
-data/
-__pycache__/
-*.pyc
-.venv/
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.claude/
+
+# Secrets and private data: never commit
 .env
+.env.*
+!.env.example
+local/
+data/
+*.key
+*.log

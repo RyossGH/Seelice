@@ -1,59 +1,45 @@
 # Seelice *(prononcez « silice »)*
 
-Seelice centralise toutes les caméras IP d'un réseau dans une seule interface web, quelle que soit leur marque.
-On branche les caméras, Seelice les détecte, et tout se pilote depuis un navigateur : mosaïque en direct,
-plein écran HD, captures, statut en temps réel.
+Seelice centralise des caméras IP dans un seul site web, à plusieurs comptes : chaque utilisateur voit ses caméras, l'administrateur voit tout.
 
-Pensé par des techniciens réseau, Seelice met l'accent sur une installation propre et sécurisée :
-caméras isolées dans leur VLAN, aucun port ouvert sur Internet, accès protégé.
+> **Branche `v2` : réécriture en cours.** La première version (Python / Flask) reste disponible sur la branche `main` et, pour référence, dans le dossier [`legacy/`](legacy/).
 
-> *La silice, c'est le verre des objectifs et des fibres optiques. Seelice, c'est voir clair sur tout votre réseau.*
+- Le plan complet : [`PLAN.md`](PLAN.md)
+- Où on en est : [`docs/AVANCEMENT.md`](docs/AVANCEMENT.md)
 
-**Stack :** Python · Flask · SQLite · ffmpeg — **Marques préréglées :** Hikvision, Dahua, Wisenet (Hanwha), Reolink, TP-Link Tapo/VIGI, Uniview, Axis + tout flux RTSP/ONVIF.
+## Démarrer en développement
 
-## Installation (Windows)
+Prérequis : [Node.js 24](https://nodejs.org/) ou plus récent.
 
-1. **Python 3.10+** : https://www.python.org/downloads/ — coche bien **« Add python.exe to PATH »**.
-2. **ffmpeg** (indispensable pour la vidéo) : dans un terminal, `winget install Gyan.FFmpeg`, puis ferme et rouvre le terminal.
-3. Double-clique sur **`lancer.bat`**.
-4. Ouvre **http://localhost:8080** et choisis ton mot de passe admin.
+```bash
+npm install        # installe les dépendances
+npm run build      # construit l'interface web
+npm run start      # lance le serveur sur http://localhost:8080
+```
 
-Sous Linux : `chmod +x lancer.sh && ./lancer.sh`.
+Par défaut, le serveur n'écoute que sur ce PC (`127.0.0.1`). Pour changer l'adresse ou le port, copie `.env.example` en `.env` et modifie-le. Le fichier `.env` n'est jamais envoyé sur Git.
 
-Depuis un autre appareil du réseau (téléphone, autre PC) : `http://<ip-du-pc>:8080`.
-Si Windows demande l'autorisation du pare-feu, accepte pour les **réseaux privés** uniquement.
+Pour travailler sur l'interface avec rechargement automatique, lance dans deux terminaux :
 
-## Premiers pas
+```bash
+npm run dev        # serveur, redémarre à chaque modification
+npm run dev:web    # interface sur http://localhost:5173
+```
 
-1. **Sans matériel** : « + Ajouter une caméra » → type « Caméra de démo » pour voir l'interface tourner.
-2. **Branche une caméra** sur le switch PoE, puis le switch sur ta box (ou sur le PC).
-3. **Scanner le réseau** → « Lancer la découverte » (ONVIF). Si une caméra annonce une IP d'un autre sous-réseau
-   (ex. Hikvision 192.168.1.64, Dahua 192.168.1.108 après reset), change son IP avec SADP / ConfigTool
-   ou sa page web pour la mettre dans le réseau de ta box.
-4. Clique sur **Ajouter**, renseigne l'utilisateur / mot de passe de la caméra. Les chemins RTSP sont pré-remplis selon la marque.
-5. Pas d'image ? Teste l'URL RTSP dans **VLC** (Média → Ouvrir un flux réseau) : si VLC n'y arrive pas, c'est
-   le chemin, les identifiants ou le RTSP désactivé dans la caméra.
+## Vérifier le code
 
-## Comment ça marche
+```bash
+npm run check
+```
 
-- Un **seul process ffmpeg par caméra et par qualité**, partagé entre tous les spectateurs. Il est coupé tout seul
-  20 s après que plus personne ne regarde.
-- La mosaïque utilise le **flux secondaire** (basse résolution), le plein écran le **flux principal** (HD).
-- Le statut en ligne / hors ligne = test de connexion TCP sur le port RTSP, toutes les 10 s.
-- Données dans `data/` : `seelice.db` (SQLite), `config.json` (mot de passe admin haché), `captures/`.
+Cette commande enchaîne la mise en forme (Prettier), le lint (ESLint), le typage (TypeScript), les tests (Vitest) et la construction de l'interface. Elle doit passer avant chaque commit.
 
-## Sécurité (à garder en tête)
+## Organisation du dépôt
 
-- Les mots de passe des caméras sont stockés **en clair** dans `data/seelice.db` (ffmpeg en a besoin) → protège ce dossier.
-- Serveur web de développement Flask, en HTTP : **réseau local uniquement**, ne jamais l'exposer sur Internet
-  (pas de redirection de port sur la box). Pour l'accès à distance → VPN (WireGuard).
-- Bonne pratique « client » : caméras dans un VLAN dédié, sans accès Internet, mot de passe unique par caméra.
-
-## Pistes pour la suite
-
-- Enregistrement continu / sur détection (segments ffmpeg + rétention 30 jours)
-- Détection IA de personnes / véhicules (Frigate ou YOLO) + notifications téléphone
-- ~~Pilotage des caméras motorisées (PTZ ONVIF)~~ ✅ fait
-- Comptes utilisateurs avec droits (admin / lecture seule)
-- Supervision des switchs PoE (SNMP : port, consommation, redémarrage d'une caméra à distance)
-- Export de la fiche d'installation (plan d'adressage, VLAN, ports) en PDF pour le client
+| Dossier | Contenu |
+|---|---|
+| `apps/server` | Serveur (Fastify, TypeScript) |
+| `apps/web` | Interface (React, Vite, Tailwind CSS) |
+| `packages/shared` | Schémas et types partagés entre le serveur et l'interface |
+| `docs` | Documentation et suivi de l'avancement |
+| `legacy` | Première version en Python / Flask, conservée pour référence |
